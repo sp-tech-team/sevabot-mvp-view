@@ -46,6 +46,26 @@ S3_USER_DOCUMENTS_PREFIX = os.getenv("S3_USER_DOCUMENTS_PREFIX", DEFAULT_S3_USER
 # Domain configuration
 ALLOWED_DOMAIN = os.getenv("ALLOWED_DOMAIN", DEFAULT_ALLOWED_DOMAIN).strip()
 
+# CORS Configuration - parse origins from APP_HOST
+def get_cors_origins():
+    """Generate CORS allowed origins from APP_HOST"""
+    origins = []
+    
+    # Add APP_HOST (CloudFront, localhost, etc)
+    if APP_HOST:
+        origins.append(APP_HOST)
+    
+    # Add localhost for development
+    origins.extend([
+        "http://localhost:3000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001"
+    ])
+    
+    return list(set(origins))  # Remove duplicates
+
+CORS_ALLOWED_ORIGINS = get_cors_origins()
+
 # Authentication
 COOKIE_SECRET = os.getenv("COOKIE_SECRET", "").strip()
 COOKIE_NAME = os.getenv("COOKIE_NAME", DEFAULT_COOKIE_NAME).strip()

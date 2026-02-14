@@ -123,40 +123,75 @@ def auth_callback(request: Request):
         html = """
         <!doctype html>
         <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Processing login...</title>
+          </head>
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
             <h2>Processing login...</h2>
             <p>Please wait while we complete your authentication.</p>
+            <div id="status" style="margin-top: 20px; color: #666;"></div>
             <script>
               (function() {
+                const statusDiv = document.getElementById('status');
+                
+                // Debug: Log hash for debugging
+                console.log('Location hash:', window.location.hash);
+                
                 const hash = window.location.hash.substring(1);
                 const params = new URLSearchParams(hash);
                 const access_token = params.get('access_token');
                 
+                console.log('Access token found:', !!access_token);
+                
                 if (!access_token) {
-                  console.error('No access token found');
-                  alert('Authentication failed. Please try again.');
-                  window.location.href = '/';
+                  console.error('No access token found in URL hash');
+                  statusDiv.textContent = 'Error: No access token found. Check browser console.';
+                  alert('Authentication failed. No token received. Please try again.');
+                  setTimeout(() => window.location.href = '/', 2000);
                   return;
                 }
                 
+                statusDiv.textContent = 'Sending authentication token to server...';
+                console.log('Calling /auth/session endpoint');
+                
                 fetch('/auth/session', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'same-origin',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  credentials: 'include',
                   body: JSON.stringify({ access_token })
-                }).then(res => res.json())
-                  .then(data => {
-                    if (data.status === 'ok') {
-                      window.location.href = '/';
-                    } else {
-                      alert(data.message || 'Login failed. Please try again.');
-                      window.location.href = '/';
-                    }
-                  }).catch(err => {
-                    console.error('Session creation error:', err);
-                    alert('Login failed. Please try again.');
-                    window.location.href = '/';
-                  });
+                }).then(res => {
+                  console.log('Response status:', res.status);
+                  console.log('Response headers:', Array.from(res.headers.entries()));
+                  
+                  if (!res.ok) {
+                    statusDiv.textContent = `Server error: HTTP ${res.status}`;
+                    throw new Error(`Server returned HTTP ${res.status}`);
+                  }
+                  return res.json();
+                }).then(data => {
+                  console.log('Session response:', data);
+                  
+                  if (data.status === 'ok') {
+                    statusDiv.textContent = 'Session created! Redirecting...';
+                    console.log('Login successful, redirecting to home');
+                    setTimeout(() => window.location.href = '/', 500);
+                  } else {
+                    statusDiv.textContent = `Error: ${data.message || 'Login failed'}`;
+                    console.error('Session endpoint returned non-ok status:', data);
+                    alert(data.message || 'Login failed. Please try again.');
+                    setTimeout(() => window.location.href = '/', 2000);
+                  }
+                }).catch(err => {
+                  console.error('Fetch error:', err);
+                  console.error('Error stack:', err.stack);
+                  statusDiv.textContent = `Error: ${err.message}`;
+                  alert('Login failed: ' + err.message + '. Check browser console.');
+                  setTimeout(() => window.location.href = '/', 2000);
+                });
               })();
             </script>
           </body>
@@ -264,7 +299,7 @@ async def create_session(payload: dict, response: Response):
             httponly=True, 
             samesite="lax", 
             max_age=SESSION_MAX_AGE,
-            secure=False,
+            secure=True,
             path="/"
         )
         

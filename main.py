@@ -22,7 +22,7 @@ except Exception as e:
 
 from ui import create_ui
 from chat_service import chat_service
-from config import USE_S3_STORAGE, COMMON_KNOWLEDGE_PATH, RAG_DOCUMENTS_PATH
+from config import USE_S3_STORAGE, COMMON_KNOWLEDGE_PATH, RAG_DOCUMENTS_PATH, CORS_ALLOWED_ORIGINS
 from s3_storage import s3_storage
 
 # Import enhanced RAG service with router
@@ -223,9 +223,9 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -254,6 +254,7 @@ async def startup_event():
     print("✅ Conversation management ready")
     print("✅ Authentication system ready")
     print("✅ Vector database cleanup endpoints ready")
+    print(f"📡 CORS Origins allowed: {CORS_ALLOWED_ORIGINS}")
     print("🌐 Application ready for traffic")
 
 @app.on_event("shutdown")
