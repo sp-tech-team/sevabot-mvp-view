@@ -1,0 +1,13 @@
+.git
+.github
+.gitignore
+README.md
+*.pyc
+__pycache__/
+.DS_Store
+.env
+*.log
+user_documents/
+rag_index/
+.pytest_cache
+*.pem

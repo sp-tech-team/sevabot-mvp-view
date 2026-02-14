@@ -1,0 +1,95 @@
+📖 Managing EC2 Auto Stop/Start with EventBridge Scheduler (AWS CLI)
+
+This guide shows how to inspect, disable, and re-enable EventBridge Scheduler jobs that automatically stop/start EC2 instances.
+
+1. List all schedules
+aws scheduler list-schedules --query "Schedules[].Name" --output text
+
+
+Example output:
+
+Stop-EC2-Instance-Daily Start-EC2-Instance-Daily
+
+2. Inspect a schedule
+aws scheduler get-schedule --name Stop-EC2-Instance-Daily --output json
+
+
+Key fields:
+
+Name – schedule identifier
+
+ScheduleExpression – cron or rate expression
+
+ScheduleExpressionTimezone – time zone of the cron
+
+State – ENABLED or DISABLED
+
+Target – action triggered (e.g., ec2:stopInstances)
+
+3. Disable a schedule
+
+Prevents execution but keeps the definition. Example for Stop EC2 schedule:
+
+aws scheduler update-schedule \
+  --name Stop-EC2-Instance-Daily \
+  --state DISABLED \
+  --schedule-expression "cron(15 21 * * ? *)" \
+  --schedule-expression-timezone "Asia/Calcutta" \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --target '{
+    "Arn":"arn:aws:scheduler:::aws-sdk:ec2:stopInstances",
+    "Input":"{\"InstanceIds\":[\"i-0f1ffdb49f0553fb5\"]}",
+    "RetryPolicy":{"MaximumEventAgeInSeconds":86400,"MaximumRetryAttempts":0},
+    "RoleArn":"arn:aws:iam::908924926461:role/EC2-Start-Stop-Scheduler-Role"
+  }'
+
+4. Re-enable a schedule
+
+Restores the job to active state:
+
+aws scheduler update-schedule \
+  --name Stop-EC2-Instance-Daily \
+  --state ENABLED \
+  --schedule-expression "cron(15 21 * * ? *)" \
+  --schedule-expression-timezone "Asia/Calcutta" \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --target '{
+    "Arn":"arn:aws:scheduler:::aws-sdk:ec2:stopInstances",
+    "Input":"{\"InstanceIds\":[\"i-0f1ffdb49f0553fb5\"]}",
+    "RetryPolicy":{"MaximumEventAgeInSeconds":86400,"MaximumRetryAttempts":0},
+    "RoleArn":"arn:aws:iam::908924926461:role/EC2-Start-Stop-Scheduler-Role"
+  }'
+
+5. Confirm state
+aws scheduler get-schedule --name Stop-EC2-Instance-Daily --query "State"
+
+
+Output will be either:
+
+"ENABLED"
+
+
+or
+
+"DISABLED"
+
+6. Alternative actions
+
+Delete schedule permanently
+
+aws scheduler delete-schedule --name Stop-EC2-Instance-Daily
+
+
+Manually start/stop EC2 (regardless of schedule)
+
+aws ec2 start-instances --instance-ids i-0f1ffdb49f0553fb5
+aws ec2 stop-instances  --instance-ids i-0f1ffdb49f0553fb5
+
+
+⚡ Pro tips
+
+EventBridge Scheduler requires the full config (--target, --schedule-expression, etc.) when updating — you can’t just flip --state.
+
+Use --cli-input-json file://schedule.json if you prefer editing the JSON directly after fetching with get-schedule.
+
+Both Stop-EC2-Instance-Daily and Start-EC2-Instance-Daily can be managed the same way.

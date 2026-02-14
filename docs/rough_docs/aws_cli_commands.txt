@@ -1,0 +1,109 @@
+LekhanifullAccess
+(base) PS C:\Users\HP> aws configure
+AWS Access Key ID [****************6XFD]: get it from slack in vcd-tech-ai-projects channel with search initials "AWS_ACCESS_KEY_ID=AKIA5"
+AWS Secret Access Key [****************GbDk]: get it from slack in vcd-tech-ai-projects channel with search initials "AWS_SECRET_ACCESS_KEY= i++rioj"
+Default region name [ap-south-1]: ap-south-1
+Default output format [json]: json
+
+
+SevabotFullAccess
+(base) PS C:\Users\HP> aws configure
+AWS Access Key ID [****************6XFD]: get it from slack in vcd-tech-ai-projects channel 
+AWS Secret Access Key [****************GbDk]: get it from slack in vcd-tech-ai-projects channel with search initials
+Default region name [ap-south-1]: ap-south-1
+Default output format [json]: json
+
+
+Connection was closed before we received a valid response from endpoint URL: "https://sts.ap-south-1.amazonaws.com/".
+(base) PS C:\Users\HP> setx AWS_CA_BUNDLE "C:\Users\HP\combined-ca.pem"
+
+SUCCESS: Specified value was saved.
+
+(base) PS C:\Users\HP> aws sts get-caller-identity
+{
+    "UserId": "AIDA5HIBFXH6TCTJD4772",
+    "Account": "908924926461",
+    "Arn": "arn:aws:iam::908924926461:user/Lekhanifullacess"
+}
+
+(base) PS C:\Users\HP> aws ec2 describe-instances --query "Reservations[*].Instances[*].[InstanceId,Tags[?Key=='Name']|[0].Value,PublicDnsName]" --output table
+|                                  DescribeInstances                                  |
++----------------------+-------+------------------------------------------------------+
+|  i-0f1ffdb49f0553fb5 |  None |  ec2-13-233-157-26.ap-south-1.compute.amazonaws.com  |
++----------------------+-------+------------------------------------------------------+
+
+(base) PS C:\Users\HP> aws lambda invoke --function-name ec2cloudfront_function --payload '{}' --cli-binary-format raw-in-base64-out response.json; Get-Content response.json | ConvertFrom-Json
+{
+    "StatusCode": 200,
+    "ExecutedVersion": "$LATEST"
+}
+
+
+status  message
+------  -------
+success Updated 2 distributions
+
+--------------------------------------------
+
+(supabase_env) PS C:\Users\HP\Desktop\ai-projects\sevabot-mvp>  ssh -i 'C:\Users\HP\Downloads\Lekhani.pem' ubuntu@ec2-13-233-157-26.ap-south-1.compute.amazonaws.com
+The authenticity of host 'ec2-13-233-157-26.ap-south-1.compute.amazonaws.com (13.233.157.26)' cant be established.
+ED25519 key fingerprint is SHA256:y4sacDrWo11R+iSaUtIzoam/0hafNRoySCdBvYdLfIA.
+This host key is known by the following other names/addresses:
+    C:\Users\HP/.ssh/known_hosts:39: ec2-13-201-132-150.ap-south-1.compute.amazonaws.com     
+    C:\Users\HP/.ssh/known_hosts:42: ec2-65-2-121-32.ap-south-1.compute.amazonaws.com        
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'ec2-13-233-157-26.ap-south-1.compute.amazonaws.com' (ED25519) to the list of known hosts.
+Welcome to Ubuntu 24.04.3 LTS (GNU/Linux 6.14.0-1012-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Sep 12 05:56:32 UTC 2025
+
+  System load:  0.0                Temperature:           -273.1 C
+  Usage of /:   80.5% of 33.83GB   Processes:             132
+  Memory usage: 46%                Users logged in:       0
+  Swap usage:   0%                 IPv4 address for ens5: 172.31.13.108
+
+
+Expanded Security Maintenance for Applications is not enabled.
+
+16 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+12 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+Last login: Thu Sep 11 15:15:48 2025 from 47.247.113.51
+ubuntu@ip-172-31-13-108:~$ 
+
+
+----------------------
+
+That one’s simple ⚡ — here’s the exact command:
+
+aws ec2 start-instances --instance-ids i-0f1ffdb49f0553fb5
+
+✅ To check the state after starting:
+aws ec2 describe-instances --instance-ids i-0f1ffdb49f0553fb5 --query "Reservations[*].Instances[*].State.Name" --output text
+
+
+It’ll show pending → then running.
+
+💡 Pro tips:
+
+You can start multiple at once:
+
+aws ec2 start-instances --instance-ids i-abc123 i-def456
+
+
+To stop instead:
+
+aws ec2 stop-instances --instance-ids i-0f1ffdb49f0553fb5
+
+
+To reboot:
+
+aws ec2 reboot-instances --instance-ids i-0f1ffdb49f0553fb5

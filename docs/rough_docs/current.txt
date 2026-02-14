@@ -1,0 +1,17 @@
+pending features:
+
+major:
+change cloud credentials
+docx online view
+file manager combine delete in overall list
+
+minor:
+✅ dns-ec2 automation cron schedule fix 
+user_documents rectification
+enable sadhguru || whitelist email
+reduce system prompt length
+
+ui:
+feedback ui
+change button color
+chat within window

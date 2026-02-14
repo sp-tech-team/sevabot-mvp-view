@@ -1,0 +1,30 @@
+users:
+admins -> dept -> spocs ->  users
+admins - all access, spocs only assigned users
+while onboarding, 2 options : add as a SPOC, assign to a SPOC
+
+data backup for delete - introduce active/inactive flag for chat sessions - may  not be required later
+
+for spocs clarification to the user:
+- manually go through chats and reply if necessary, augmented answer with q/a reference
+- send notif to user for augmented answer
+- append the clarification in the same answer, send notif to notif tab. when user clicks on it, ideally it redirects to the same augmented answer.
+
+users:
+- general help feature for suggestions/improvements for the overall bot
+- general flag for good/bad like chatgpt
+
+migrate to vcd.tech.server@gmail.com google cloud
+
+latency:
+chrono analysis
+request parallel processing to avoid queuing (check async/event-driven architecture)
+intelligent caching
+system prompt optimisation
+printing word by word
+infra tuning (eg. increasing memory, changing region from mum to us wrt to api)
+
+future:
+load balancing
+fine tuning answers using agentic AI (fine tuned model) for language
+excel/csv compatible

@@ -1,0 +1,38 @@
+# Core framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# UI - Gradio 4.x stable (avoid 6.x which breaks everything)
+gradio>=4.0.0,<6.0.0
+
+# Database
+supabase
+
+# Environment
+python-dotenv
+
+# Authentication
+itsdangerous
+
+# AI and ML - let pip resolve compatible versions
+openai
+langchain
+langchain-core
+langchain-openai
+langchain-chroma
+langchain-community
+langchain-text-splitters
+
+# Vector database
+chromadb
+
+# Document processing
+pypdf
+pymupdf
+python-docx
+docx2txt
+
+# Utilities
+boto3
+botocore

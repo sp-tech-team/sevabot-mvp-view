@@ -1,0 +1,22 @@
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Credentials / secrets
+config.json
+secrets.json
+.env
+.env.*
+
+# Logs
+*.log
+
+# Test files
+test_files/
+user_documents/

@@ -1,0 +1,22 @@
+space:
+df -h
+
+-----------
+continuous ram
+watch -n 1 free -h
+
+Every 1.0s: free -h                                                                              ip-172-31-13-108: Sat Sep  6 06:32:03 2025
+
+               total        used        free      shared  buff/cache   available
+Mem:           3.7Gi       2.0Gi       675Mi        24Mi       1.4Gi       1.8Gi
+Swap:             0B          0B          0B
+
+----------------
+
+list containers:
+docker ps -a
+
+docker images
+
+docker rmi REPOSITORY:TAG
+EG. 908924926461.dkr.ecr.ap-south-1.amazonaws.com/vcd-tech/sevabot-mvp-gradio:88ce55026c4fcdd4641ec2349833e149c86d4f81

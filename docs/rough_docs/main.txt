@@ -1,0 +1,45 @@
+## Chat:
+🔥 reduce the chat window size to fit within the window
+🔥 change button colors for new chat row
+🟡 move the tabs to left instead of top-bar
+🟡 when we send a chat, the namaskaram is not stored - it's good, but shall we just show simple namaskaram new chat like claude/chatgpt
+
+## Files:
+🔥 View/download both leads to download. view is not working
+
+## File manager, both common and users:
+🔥 when deleting file, the files should be in a backup folder?
+🔥 when uploaded by a user, only his name should come, not the user name under while file is being uploaded eg. see user_documents
+🔥 integrate drive API + cron job for files backup
+🟡 merge delete and listing files options
+🟡 re-index/cleanup/vector stats - rename buttons and display progress text, clear option for progress text, single option to show progress text
+
+## Users:
+🔥 features:
+    - promote or demote user should be renamed to add spoc, remove spoc
+    - make deletion table separate
+    - active/inactive whitelist users UI
+    - while onboarding users, orphan or assign SPOC option
+🟡 user management repeated fucntions in ui.py and user_management.py
+
+## Miscellaneous:
+🔥 move google cloud to vcd.tech.server gmail
+🟡 change ui theme
+🟡 do load testing and balancing if needed with improved users\
+
+## 🔥 Review tab:
+users:
+    - seek clarification button in chat after feedback if not good
+    - tab for tracking q/a (sort by date/category)
+    - send reply with q/a and highlight chat session
+admins/spocs:
+    - clarification input for q/a pair
+    - heirarchy for admins -> spocs -> users for view q/a
+    - integrate mail api/wa for reply
+
+## Advanced:
+🔥reduce system prompt length for cost optimisation
+🟡 logging in elastic search/splunk - debugging, graphs, metrics tracking. Overhead is converting to event-driven architecture
+caching questions & answers 
+advanced rag for better answer generation
+personal docs rag

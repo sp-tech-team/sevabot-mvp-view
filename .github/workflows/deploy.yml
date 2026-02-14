@@ -1,0 +1,291 @@
+name: Deploy Sevabot to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-south-1
+        
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Save current image tag for rollback
+      id: current-image
+      run: |
+        # Get the current running container's image (this is our backup reference)
+        CURRENT_IMAGE=$(docker inspect sevabot-container --format='{{.Image}}' 2>/dev/null || echo "none")
+        echo "current_image=${CURRENT_IMAGE}" >> $GITHUB_OUTPUT
+        echo "📦 Current running image ID: ${CURRENT_IMAGE}"
+      continue-on-error: true
+    
+    - name: Check disk space and cleanup safely
+      run: |
+        echo "💾 Checking disk space..."
+        df -h | grep -E "Filesystem|/dev/root"
+        AVAILABLE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+        echo "Available space: ${AVAILABLE}GB"
+        
+        if [ "$AVAILABLE" -lt 5 ]; then
+          echo "⚠️  Low disk space detected, cleaning Docker safely..."
+          # Only remove dangling images and stopped containers (safe for multi-container setup)
+          docker image prune -f
+          docker container prune -f
+          # Remove old sevabot images (not latest, not currently running)
+          docker images | grep "vcd-tech/sevabot-mvp-gradio" | grep -v "latest" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+          echo "✅ Safe Docker cleanup complete"
+        else
+          echo "✅ Sufficient disk space available"
+        fi
+      
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: vcd-tech/sevabot-mvp-gradio
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "🔨 Building Docker image..."
+        # Build the docker image
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "📤 Pushing to ECR (this serves as our backup!)..."
+        # Push the docker images - ECR maintains version history
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "✅ Build and push successful"
+        
+    - name: Install Nginx
+      run: |
+        # Install Nginx if not installed
+        if ! command -v nginx &> /dev/null; then
+          echo "Installing Nginx..."
+          sudo apt-get update
+          sudo apt-get install -y nginx
+        fi
+        
+        # Create directories if they don't exist
+        sudo mkdir -p /etc/nginx/sites-available
+        sudo mkdir -p /etc/nginx/sites-enabled
+
+    - name: Create persistent directories
+      run: |
+        mkdir -p /home/ubuntu/sevabot_data/rag_index
+        mkdir -p /home/ubuntu/sevabot_data/user_documents
+        mkdir -p /home/ubuntu/sevabot_data/common_knowledge
+        
+    - name: Deploy Container
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: vcd-tech/sevabot-mvp-gradio
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "🛑 Stopping existing container..."
+        # Stop any existing container
+        docker stop sevabot-container 2>/dev/null || true
+        docker rm sevabot-container 2>/dev/null || true
+        
+        # Create backup directory for S3 migration (if needed)
+        sudo mkdir -p /home/ubuntu/sevabot_backup
+        
+        echo "🚀 Starting new container..."
+        # Run the container with environment variables including S3 configuration
+        docker run -d \
+          --name sevabot-container \
+          -p 8001:8001 \
+          --restart always \
+          -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+          -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+          -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+          -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+          -e COOKIE_SECRET="${{ secrets.COOKIE_SECRET }}" \
+          -e COOKIE_NAME="${{ secrets.COOKIE_NAME }}" \
+          -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+          -e REDIRECT_URI="${{ vars.REDIRECT_URI }}" \
+          -e APP_HOST="${{ vars.APP_HOST }}" \
+          -e ALLOWED_DOMAIN="${{ vars.ALLOWED_DOMAIN }}" \
+          -e USE_S3_STORAGE=true \
+          -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+          -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+          -v /home/ubuntu/sevabot_data/user_documents:/app/user_documents \
+          -v /home/ubuntu/sevabot_data/rag_index:/app/rag_index \
+          -v /home/ubuntu/sevabot_data/common_knowledge:/app/common_knowledge \
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        # Wait for container to start
+        echo "⏳ Waiting for container to start..."
+        sleep 10
+        
+        # Check container health
+        if docker ps | grep -q sevabot-container; then
+          echo "✅ Container started successfully"
+          docker logs sevabot-container --tail 20
+        else
+          echo "❌ Container failed to start"
+          docker logs sevabot-container
+          exit 1
+        fi
+        
+    - name: Configure Nginx
+      run: |
+        echo "🔧 Configuring Nginx..."
+        cat > /tmp/sevabot_nginx << 'EOL'
+        server {
+            listen 8080;
+            server_name _;
+            
+            # Increase client body size for file uploads
+            client_max_body_size 100M;
+            
+            location / {
+                proxy_pass http://localhost:8001;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+                proxy_read_timeout 300;
+                proxy_connect_timeout 300;
+                proxy_send_timeout 300;
+            }
+        }
+        EOL
+        
+        sudo cp /tmp/sevabot_nginx /etc/nginx/sites-available/sevabot
+        sudo ln -sf /etc/nginx/sites-available/sevabot /etc/nginx/sites-enabled/
+        sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+        sudo nginx -t
+        sudo systemctl restart nginx
+        echo "✅ Nginx configured and restarted"
+    
+    - name: Cleanup old local images
+      run: |
+        echo "🧹 Cleaning up old local sevabot images..."
+        # Only remove old sevabot images that are not latest and not current SHA
+        docker images | grep "vcd-tech/sevabot-mvp-gradio" | grep -v "latest\|${{ github.sha }}" | awk '{print $3}' | xargs -r docker rmi -f 2>/dev/null || true
+        echo "✅ Cleanup complete"
+      continue-on-error: true
+    
+    - name: Display deployment summary
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "✅ DEPLOYMENT SUCCESSFUL!"
+        echo "=========================================="
+        echo "S3 Storage: ENABLED"
+        echo "Container Status: $(docker inspect --format='{{.State.Status}}' sevabot-container)"
+        echo "Application URL: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
+        echo ""
+        echo "📊 Image Info:"
+        docker images | grep "vcd-tech/sevabot-mvp-gradio" | head -3
+        echo ""
+        echo "📊 Disk Usage:"
+        df -h / | grep -E "Filesystem|/dev/root"
+        echo ""
+        echo "✨ Deployment completed successfully!"
+    
+    - name: Rollback on failure
+      if: failure()
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: vcd-tech/sevabot-mvp-gradio
+        CURRENT_IMAGE: ${{ steps.current-image.outputs.current_image }}
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "⚠️  DEPLOYMENT FAILED - ROLLING BACK"
+        echo "=========================================="
+        
+        # Stop failed container
+        docker stop sevabot-container 2>/dev/null || true
+        docker rm sevabot-container 2>/dev/null || true
+        
+        # Rollback strategy: Use the previously running image
+        if [ "$CURRENT_IMAGE" != "none" ] && [ -n "$CURRENT_IMAGE" ]; then
+          echo "🔄 Restoring previous image (ID: $CURRENT_IMAGE)"
+          
+          # The previous image should still be on disk since we haven't cleaned it yet
+          docker run -d \
+            --name sevabot-container \
+            -p 8001:8001 \
+            --restart always \
+            -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+            -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+            -e COOKIE_SECRET="${{ secrets.COOKIE_SECRET }}" \
+            -e COOKIE_NAME="${{ secrets.COOKIE_NAME }}" \
+            -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            -e REDIRECT_URI="${{ vars.REDIRECT_URI }}" \
+            -e APP_HOST="${{ vars.APP_HOST }}" \
+            -e ALLOWED_DOMAIN="${{ vars.ALLOWED_DOMAIN }}" \
+            -e USE_S3_STORAGE=true \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -v /home/ubuntu/sevabot_data/user_documents:/app/user_documents \
+            -v /home/ubuntu/sevabot_data/rag_index:/app/rag_index \
+            -v /home/ubuntu/sevabot_data/common_knowledge:/app/common_knowledge \
+            $CURRENT_IMAGE
+          
+          sleep 5
+          
+          if docker ps | grep -q sevabot-container; then
+            echo "✅ Rollback successful - previous version restored"
+          else
+            echo "❌ Rollback failed - trying to pull and use previous version from ECR..."
+            docker logs sevabot-container 2>&1 || true
+            
+            # Last resort: Pull previous latest from ECR
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest || true
+            docker run -d \
+              --name sevabot-container \
+              -p 8001:8001 \
+              --restart always \
+              -e SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+              -e SUPABASE_KEY="${{ secrets.SUPABASE_KEY }}" \
+              -e SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+              -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              -e COOKIE_SECRET="${{ secrets.COOKIE_SECRET }}" \
+              -e COOKIE_NAME="${{ secrets.COOKIE_NAME }}" \
+              -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+              -e REDIRECT_URI="${{ vars.REDIRECT_URI }}" \
+              -e APP_HOST="${{ vars.APP_HOST }}" \
+              -e ALLOWED_DOMAIN="${{ vars.ALLOWED_DOMAIN }}" \
+              -e USE_S3_STORAGE=true \
+              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -v /home/ubuntu/sevabot_data/user_documents:/app/user_documents \
+              -v /home/ubuntu/sevabot_data/rag_index:/app/rag_index \
+              -v /home/ubuntu/sevabot_data/common_knowledge:/app/common_knowledge \
+              $ECR_REGISTRY/$ECR_REPOSITORY:latest || true
+          fi
+        else
+          echo "❌ No previous image found for rollback"
+          echo "⚠️  Manual intervention required"
+        fi
+        
+        echo ""
+        echo "=========================================="
+        echo "⚠️  CHECK APPLICATION STATUS MANUALLY"
+        echo "=========================================="

@@ -1,0 +1,35 @@
+semantic chunkr instead of character split
+
+nginx 100+ concurrent users - for scaling, aws load balancing or auto-scaling
+
+upload non-ocr doc only
+
+✅ RLS is ENABLED on 8 database tables
+❌ RLS policies are NOT actively filtering (all allow: USING (true))
+✅ ACCESS CONTROL happens in APPLICATION CODE, not database
+
+RLS can be used for admin user spoc assignments also without much application code
+
+supabase pauses after 7 days, inactive after 90 days - write small lambda function to update every week
+
+create config document on github/aws/supabase/google cloud - user guide/admin guide
+
+use appwright/supabase etc. for integrated BAAS (backend as a service) - all db types
+
+github action usage limits 2000 minutes/month
+
+lekhani auto-deletion not present in ci/cd leaidng to stale images pileup in ec2, leading to choking and ec2 system hangup
+
+t3.large -> t3.medium ec2
+
+langgraph + mcp usage:
+multi step reasoning: during pure text rag, based on complexity, for multi document syntheis which is beyond the scope of configured chunk size
+for excel based rag: break down queries into natural language and nl to sql, fetch data, etc.
+during routing to either db or vectordb, planning module is useful
+raising a ticket/sending an email/whatsapp
+
+ragas evaluation
+
+redis caching
+
+mention categorisation notebook into lekhani readme
